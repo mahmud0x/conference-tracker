@@ -270,9 +270,7 @@ h1 {
 }
 
 .conference-table thead th {
-  position: sticky;
-  top: 101px;
-  z-index: 10;
+  position: static;
   background: var(--surface-subtle);
   color: var(--muted);
   font-size: 0.7rem;
@@ -432,7 +430,6 @@ h1 {
   .filter-primary { flex-wrap: wrap; }
   .search-field { flex-basis: 100%; }
   .conference-table { min-width: 980px; }
-  .conference-table thead th { top: 151px; }
 }
 
 @media (max-width: 720px) {
