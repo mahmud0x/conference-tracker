@@ -1,0 +1,66 @@
+name: Update Conference Data and Deploy
+
+on:
+  # Run automatically every day.
+  # GitHub cron uses UTC.
+  schedule:
+    - cron: "17 8 * * *"
+
+  # Allow manual execution from Actions tab.
+  workflow_dispatch:
+
+  # Redeploy whenever you edit the website.
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download latest conference data
+        run: |
+          mkdir -p data
+
+          curl \
+            --fail \
+            --location \
+            --retry 3 \
+            "https://honestcsrankings.org/data/conferences.json" \
+            -o data/conferences.json
+
+      - name: Validate JSON
+        run: |
+          jq empty data/conferences.json
+          echo "Conference JSON is valid."
+          echo "Conference count:"
+          jq '.conferences | length' data/conferences.json
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: "."
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
