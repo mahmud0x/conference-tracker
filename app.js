@@ -19,15 +19,16 @@ const el = {
   rankFilters: document.querySelector("#rankFilters"),
   yearFilter: document.querySelector("#yearFilter"),
   deadlineFilter: document.querySelector("#deadlineFilter"),
+  sortFilter: document.querySelector("#sortFilter"),
   resetFilters: document.querySelector("#resetFilters"),
-  conferenceBody: document.querySelector("#conferenceBody"),
+  conferenceList: document.querySelector("#conferenceList"),
   emptyState: document.querySelector("#emptyState"),
   errorState: document.querySelector("#errorState"),
   resultText: document.querySelector("#resultText"),
+  resultCount: document.querySelector("#resultCount"),
   aStarCount: document.querySelector("#aStarCount"),
   closingSoonCount: document.querySelector("#closingSoonCount"),
   snapshotDate: document.querySelector("#snapshotDate"),
-  sortButtons: [...document.querySelectorAll(".sort-button")],
 };
 
 function parseDate(value) {
@@ -69,13 +70,13 @@ function formatConferenceDates(start, end) {
   if (!start || start === end) return formatDate(start || end);
   if (!end) return formatDate(start);
 
-  const startDate = parseDate(start);
-  const endDate = parseDate(end);
-  if (!startDate || !endDate) return `${formatDate(start)} – ${formatDate(end)}`;
+  const a = parseDate(start);
+  const b = parseDate(end);
+  if (!a || !b) return `${formatDate(start)} – ${formatDate(end)}`;
 
-  if (startDate.getFullYear() === endDate.getFullYear() && startDate.getMonth() === endDate.getMonth()) {
-    const month = new Intl.DateTimeFormat(undefined, { month: "short" }).format(startDate);
-    return `${month} ${startDate.getDate()}–${endDate.getDate()}, ${endDate.getFullYear()}`;
+  if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) {
+    const month = new Intl.DateTimeFormat(undefined, { month: "short" }).format(a);
+    return `${month} ${a.getDate()}–${b.getDate()}, ${b.getFullYear()}`;
   }
   return `${formatDate(start)} – ${formatDate(end)}`;
 }
@@ -89,10 +90,11 @@ function deadlineStatus(deadline) {
 function deadlinePill(deadline) {
   const days = dayDiff(deadline);
   if (days === null) return { label: "TBA", className: "" };
-  if (days === 0) return { label: "today", className: "soon" };
-  if (days > 0 && days <= 30) return { label: `${days}d`, className: "soon" };
-  if (days > 30) return { label: `${days}d`, className: "" };
-  return { label: "passed", className: "passed" };
+  if (days < 0) return { label: "passed", className: "passed" };
+  if (days === 0) return { label: "today", className: "urgent" };
+  if (days <= 7) return { label: `${days}d`, className: "urgent" };
+  if (days <= 30) return { label: `${days}d`, className: "soon" };
+  return { label: `${days}d`, className: "" };
 }
 
 function categoryLabel(category) {
@@ -115,6 +117,15 @@ function normalizeConference(c) {
   };
 }
 
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function buildYearOptions(conferences) {
   const years = [...new Set(conferences.map(c => c.year).filter(Boolean))].sort((a, b) => a - b);
   for (const year of years) {
@@ -127,14 +138,10 @@ function buildYearOptions(conferences) {
 
 function matchesSearch(c, query) {
   if (!query) return true;
-  const haystack = [
-    c.name,
-    c.acronym,
-    c.category,
-    c.location?.city,
-    c.location?.country,
-    c.year,
-  ].filter(Boolean).join(" ").toLowerCase();
+  const haystack = [c.name, c.acronym, c.category, c.location?.city, c.location?.country, c.year]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
   return haystack.includes(query.toLowerCase());
 }
 
@@ -155,7 +162,7 @@ function filteredConferences() {
     return matchesSearch(c, state.search);
   });
 
-  return result.sort((a, b) => {
+  result.sort((a, b) => {
     if (state.sort === "name") {
       return (a.acronym || a.name || "").localeCompare(b.acronym || b.name || "");
     }
@@ -163,55 +170,63 @@ function filteredConferences() {
       return (RANK_ORDER[a.rank] ?? 99) - (RANK_ORDER[b.rank] ?? 99) || deadlineSortKey(a) - deadlineSortKey(b);
     }
     if (state.sort === "date") {
-      const aTime = parseDate(a.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const bTime = parseDate(b.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      return aTime - bTime || (RANK_ORDER[a.rank] ?? 99) - (RANK_ORDER[b.rank] ?? 99);
+      const at = parseDate(a.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const bt = parseDate(b.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return at - bt || (RANK_ORDER[a.rank] ?? 99) - (RANK_ORDER[b.rank] ?? 99);
     }
     return deadlineSortKey(a) - deadlineSortKey(b) || (RANK_ORDER[a.rank] ?? 99) - (RANK_ORDER[b.rank] ?? 99);
   });
+
+  return result;
 }
 
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function rowHTML(c) {
-  const title = c.acronym || c.name || "Unnamed conference";
-  const fullName = c.name && c.name !== title ? c.name : "";
+function conferenceHTML(c) {
+  const acronym = c.acronym || c.name || "Unnamed conference";
+  const fullName = c.name && c.name !== acronym ? c.name : "";
   const officialUrl = /^https?:\/\//i.test(c.url || "") ? c.url : "";
   const pill = deadlinePill(c.deadline);
-  const rate = Number.isFinite(c.acceptance_rate) ? `${c.acceptance_rate}%` : "—";
+  const acceptance = Number.isFinite(c.acceptance_rate) ? `${c.acceptance_rate}% acceptance` : "Acceptance TBA";
 
   return `
-    <tr>
-      <td data-label="Venue">
-        ${officialUrl
-          ? `<a class="venue-link" href="${escapeHTML(officialUrl)}" target="_blank" rel="noreferrer">${escapeHTML(title)}${c.year ? ` ${escapeHTML(String(c.year))}` : ""}<span class="external">↗</span></a>`
-          : `<span class="venue-link">${escapeHTML(title)}${c.year ? ` ${escapeHTML(String(c.year))}` : ""}</span>`}
-        ${fullName ? `<div class="venue-name" title="${escapeHTML(fullName)}">${escapeHTML(fullName)}</div>` : ""}
-      </td>
-      <td data-label="Rank"><span class="rank-badge" data-rank="${escapeHTML(c.rank)}">${escapeHTML(c.rank)}</span></td>
-      <td data-label="Area"><span class="area-label">${escapeHTML(categoryLabel(c.category))}</span></td>
-      <td data-label="Deadline">
-        <div class="deadline-wrap">
+    <article class="conference-card" data-rank="${escapeHTML(c.rank)}">
+      <div class="venue-block">
+        <div class="venue-top">
+          <span class="venue-title">${escapeHTML(acronym)}</span>
+          ${c.year ? `<span class="venue-year">${escapeHTML(c.year)}</span>` : ""}
+          <span class="badge rank-badge" data-rank="${escapeHTML(c.rank)}">${escapeHTML(c.rank)}</span>
+          <span class="badge area-badge">${escapeHTML(categoryLabel(c.category))}</span>
+        </div>
+        ${fullName ? `<div class="venue-full" title="${escapeHTML(fullName)}">${escapeHTML(fullName)}</div>` : ""}
+      </div>
+
+      <div class="info-block deadline-block">
+        <span class="info-label">Submission</span>
+        <div class="deadline-line">
           <span class="deadline-date">${escapeHTML(c.deadline ? formatDate(c.deadline) : "TBA")}</span>
           <span class="deadline-pill ${pill.className}">${escapeHTML(pill.label)}</span>
         </div>
-      </td>
-      <td data-label="Conference"><span class="date-main">${escapeHTML(formatConferenceDates(c.startDate, c.endDate))}</span></td>
-      <td data-label="Location"><span class="location-main">${escapeHTML(locationLabel(c.location))}</span></td>
-      <td data-label="Acceptance"><span class="acceptance-main">${escapeHTML(rate)}</span></td>
-    </tr>
-  `;
+        <div class="meta-line">${escapeHTML(acceptance)}</div>
+      </div>
+
+      <div class="info-block event-block">
+        <span class="info-label">Conference</span>
+        <span class="info-value">${escapeHTML(formatConferenceDates(c.startDate, c.endDate))}</span>
+      </div>
+
+      <div class="info-block location-block">
+        <span class="info-label">Location</span>
+        <span class="info-value">${escapeHTML(locationLabel(c.location))}</span>
+      </div>
+
+      ${officialUrl
+        ? `<a class="visit" href="${escapeHTML(officialUrl)}" target="_blank" rel="noreferrer" aria-label="Open ${escapeHTML(acronym)} website">↗</a>`
+        : `<span class="visit disabled" aria-hidden="true">↗</span>`}
+    </article>`;
 }
 
 function updateSummary(visible) {
   el.resultText.textContent = `${visible.length} conference${visible.length === 1 ? "" : "s"}`;
+  el.resultCount.textContent = visible.length.toLocaleString();
   el.aStarCount.textContent = visible.filter(c => c.rank === "A*").length.toLocaleString();
   el.closingSoonCount.textContent = visible.filter(c => {
     const days = dayDiff(c.deadline);
@@ -219,20 +234,10 @@ function updateSummary(visible) {
   }).length.toLocaleString();
 }
 
-function updateSortButtons() {
-  for (const button of el.sortButtons) {
-    const active = button.dataset.sort === state.sort;
-    button.classList.toggle("active", active);
-    const indicator = button.querySelector("span");
-    if (indicator) indicator.textContent = active ? "↑" : "↕";
-  }
-}
-
 function render() {
   const visible = filteredConferences();
   updateSummary(visible);
-  updateSortButtons();
-  el.conferenceBody.innerHTML = visible.map(rowHTML).join("");
+  el.conferenceList.innerHTML = visible.map(conferenceHTML).join("");
   el.emptyState.hidden = visible.length !== 0;
 }
 
@@ -273,12 +278,10 @@ function bindEvents() {
     render();
   });
 
-  for (const button of el.sortButtons) {
-    button.addEventListener("click", () => {
-      state.sort = button.dataset.sort;
-      render();
-    });
-  }
+  el.sortFilter.addEventListener("change", event => {
+    state.sort = event.target.value;
+    render();
+  });
 
   el.resetFilters.addEventListener("click", () => {
     state.search = "";
@@ -291,7 +294,8 @@ function bindEvents() {
     el.search.value = "";
     el.yearFilter.value = "all";
     el.deadlineFilter.value = "upcoming";
-    document.querySelectorAll(".toggle").forEach(button => {
+    el.sortFilter.value = "deadline";
+    document.querySelectorAll(".chip").forEach(button => {
       button.classList.add("active");
       button.setAttribute("aria-pressed", "true");
     });
@@ -313,7 +317,6 @@ async function loadData() {
       .filter(c => ALLOWED_CATEGORIES.has(c.category) && ALLOWED_RANKS.has(c.rank));
 
     buildYearOptions(state.conferences);
-
     const snapshot = data?.metadata?.pruned_at || data?.pruned_at || data?.metadata?.generated_at || null;
     el.snapshotDate.textContent = formatSnapshot(snapshot);
 
@@ -322,8 +325,9 @@ async function loadData() {
   } catch (error) {
     console.error(error);
     el.resultText.textContent = "Data unavailable";
+    el.resultCount.textContent = "—";
     el.errorState.hidden = false;
-    document.querySelector(".conference-table").hidden = true;
+    el.conferenceList.hidden = true;
   }
 }
 
