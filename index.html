@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CORE A*, A, and B conferences in AI/ML, Security, and Software Engineering." />
+  <meta name="color-scheme" content="light" />
+  <title>CS Conference Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div>
+        <p class="kicker">AI/ML · SECURITY · SOFTWARE ENGINEERING</p>
+        <h1>Top CS Conference Tracker</h1>
+        <p class="subtitle">CORE A*, A, and B venues with deadlines, dates, and locations.</p>
+      </div>
+      <a class="source-link" href="https://honestcsrankings.org/data/conferences.json" target="_blank" rel="noreferrer">
+        Honest CS Rankings <span aria-hidden="true">↗</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <section class="filter-shell" aria-label="Conference filters">
+      <div class="filter-primary">
+        <label class="search-field" for="search">
+          <span class="sr-only">Search conferences</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+          <input id="search" type="search" placeholder="Search venue, acronym, city, country…" autocomplete="off" />
+        </label>
+
+        <label class="select-field">
+          <span>Year</span>
+          <select id="yearFilter">
+            <option value="all">All years</option>
+          </select>
+        </label>
+
+        <label class="select-field">
+          <span>Deadline</span>
+          <select id="deadlineFilter">
+            <option value="upcoming">Upcoming</option>
+            <option value="all">All</option>
+            <option value="passed">Passed</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="filter-secondary">
+        <div class="filter-group" id="rankFilters" aria-label="CORE rank filters">
+          <span class="group-label">Rank</span>
+          <button class="toggle rank-toggle rank-star active" type="button" data-rank="A*" aria-pressed="true">A*</button>
+          <button class="toggle rank-toggle rank-a active" type="button" data-rank="A" aria-pressed="true">A</button>
+          <button class="toggle rank-toggle rank-b active" type="button" data-rank="B" aria-pressed="true">B</button>
+        </div>
+
+        <div class="filter-group" id="categoryFilters" aria-label="Research area filters">
+          <span class="group-label">Area</span>
+          <button class="toggle active" type="button" data-category="AI/ML" aria-pressed="true">AI / ML</button>
+          <button class="toggle active" type="button" data-category="Security" aria-pressed="true">Security</button>
+          <button class="toggle active" type="button" data-category="SWE" aria-pressed="true">Software</button>
+        </div>
+
+        <button id="resetFilters" class="reset-button" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="summary-bar" aria-live="polite">
+      <p id="resultText">Loading conferences…</p>
+      <div class="summary-meta">
+        <span><strong id="aStarCount">—</strong> A*</span>
+        <span><strong id="closingSoonCount">—</strong> closing ≤30d</span>
+        <span>updated <strong id="snapshotDate">—</strong></span>
+      </div>
+    </section>
+
+    <section class="table-shell" aria-label="Conference results">
+      <div class="table-scroll">
+        <table class="conference-table">
+          <thead>
+            <tr>
+              <th class="venue-col"><button class="sort-button" data-sort="name" type="button">Venue <span>↕</span></button></th>
+              <th><button class="sort-button" data-sort="rank" type="button">Rank <span>↕</span></button></th>
+              <th>Area</th>
+              <th class="deadline-col"><button class="sort-button active" data-sort="deadline" type="button">Deadline <span>↑</span></button></th>
+              <th><button class="sort-button" data-sort="date" type="button">Conference <span>↕</span></button></th>
+              <th>Location</th>
+              <th class="acceptance-col">Acceptance</th>
+            </tr>
+          </thead>
+          <tbody id="conferenceBody"></tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" class="empty-state" hidden>
+        <strong>No matching conferences.</strong>
+        <span>Try widening the rank, area, year, or deadline filters.</span>
+      </div>
+
+      <div id="errorState" class="empty-state error-state" hidden>
+        <strong>Conference data could not be loaded.</strong>
+        <span>The page expects <code>data/conferences.json</code>.</span>
+      </div>
+    </section>
+
+    <p class="verification-note">Rankings and dates are sourced from Honest CS Rankings. Verify submission details on the official conference website before submitting.</p>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
